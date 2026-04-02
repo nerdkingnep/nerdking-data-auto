@@ -1,37 +1,49 @@
 import json
+import urllib.request
+import re
 from datetime import datetime
-from curl_cffi import requests
 
 def fetch_musinsa_trends():
-    url = 'https://api.musinsa.com/api2/sc/v1/keyword/search-home?popularCount=20&gf=A'
-    try:
-        # 실제 크롬 브라우저와 100% 동일한 네트워크 지문을 생성하여 방화벽을 통과합니다.
-        response = requests.get(url, impersonate="chrome110", timeout=15)
-        
-        if response.status_code != 200:
-            print(f"접속 실패 (상태 코드: {response.status_code})")
-            return
+    # 무신사의 데이터센터 IP 차단을 완벽하게 우회하기 위한 징검다리 서버 목록
+    # 1. Jina AI 리더 API: 글로벌 레지덴셜 프록시를 사용하여 봇 차단을 통과합니다.
+    # 2. 구글 번역기 캐시 서버: 구글의 공식 IP를 빌려 무신사에 우회 접속합니다.
+    urls_to_try = [
+        'https://r.jina.ai/https://api.musinsa.com/api2/sc/v1/keyword/search-home?popularCount=20&gf=A',
+        'https://translate.google.com/website?sl=ko&tl=ko&hl=ko&u=https://api.musinsa.com/api2/sc/v1/keyword/search-home?popularCount=20&gf=A'
+    ]
+    
+    keywords = []
+    
+    for url in urls_to_try:
+        print(f"우회 서버 접속 시도 중: {url[:50]}...")
+        try:
+            # 봇 차단을 피하기 위한 기본 브라우저 정보 입력
+            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'})
+            with urllib.request.urlopen(req, timeout=20) as response:
+                html = response.read().decode('utf-8')
+                
+                # 우회 서버가 반환하는 복잡한 HTML이나 마크다운 텍스트 속에서 keyword 데이터만 강제로 추출합니다.
+                matches = re.findall(r'"keyword"\s*:\s*"([^"]+)"', html)
+                
+                if matches:
+                    seen = set()
+                    for m in matches:
+                        if m.strip() and m not in seen:
+                            seen.add(m)
+                            keywords.append(m)
+                    
+                    print("데이터 우회 추출에 완벽하게 성공했습니다!")
+                    break # 성공 시 다음 우회 경로는 시도하지 않고 루프를 종료합니다.
+        except Exception as e:
+            print(f"해당 경로 우회 실패: {e}")
             
-        data = response.json()
-        keywords = []
-        
-        if 'data' in data and 'keywordList' in data['data']:
-            keywords = [item['keyword'] for item in data['data']['keywordList']]
-        elif 'data' in data and 'popularKeyword' in data['data']:
-            keywords = [item['keyword'] for item in data['data']['popularKeyword']]
-        
-        if not keywords:
-            print("데이터를 성공적으로 받았으나 키워드 목록이 비어있습니다.")
-            return
-        
-        # 정상적으로 키워드가 수집되었을 때만 파일을 덮어씌워 빈 파일 생성을 방지합니다.
+    if keywords:
+        # 추출한 데이터를 깃허브 내에 json 파일로 영구 저장합니다.
         with open('musinsa_trends.json', 'w', encoding='utf-8') as f:
             json.dump({"updated_at": str(datetime.now()), "keywords": keywords}, f, ensure_ascii=False)
-        
-        print(f"수집 및 저장 완료: 총 {len(keywords)}개의 키워드 확보")
-        
-    except Exception as e:
-        print(f"수집 중 에러 발생: {e}")
+        print(f"최종 수집 완료: {len(keywords)}개의 트렌드 키워드를 확보했습니다.")
+    else:
+        print("모든 우회 경로 접속이 차단되었습니다. 수집된 데이터가 없습니다.")
 
 if __name__ == "__main__":
     fetch_musinsa_trends()
