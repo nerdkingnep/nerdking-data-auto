@@ -18,8 +18,8 @@ jobs:
       with:
         python-version: '3.10'
 
-    - name: 크롬 위장 라이브러리 설치
-      run: pip install curl_cffi
+    - name: 클라우드플레어 우회 라이브러리 설치
+      run: pip install cloudscraper
 
     - name: 파이썬 수집 코드 실행
       env:
