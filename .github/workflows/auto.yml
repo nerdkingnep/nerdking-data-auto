@@ -2,9 +2,8 @@ name: Daily Data Automation
 
 on:
   schedule:
-    # 매일 한국시간 오전 10시에 실행 (서버 기준 시간인 UTC 01시로 설정됨)
     - cron: '0 1 * * *'
-  workflow_dispatch: # 기다리지 않고 수동으로 실행해볼 수 있는 버튼 생성
+  workflow_dispatch:
 
 jobs:
   build:
@@ -12,12 +11,15 @@ jobs:
 
     steps:
     - name: 저장소 코드 불러오기
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: 파이썬 환경 세팅
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.10'
+
+    - name: 크롬 위장 라이브러리 설치
+      run: pip install curl_cffi
 
     - name: 파이썬 수집 코드 실행
       env:
