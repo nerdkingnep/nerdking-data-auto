@@ -1,0 +1,33 @@
+name: Daily Data Automation
+
+on:
+  schedule:
+    # 매일 한국시간 오전 10시에 실행 (서버 기준 시간인 UTC 01시로 설정됨)
+    - cron: '0 1 * * *'
+  workflow_dispatch: # 기다리지 않고 수동으로 실행해볼 수 있는 버튼 생성
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: 저장소 코드 불러오기
+      uses: actions/checkout@v3
+
+    - name: 파이썬 환경 세팅
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
+    - name: 파이썬 수집 코드 실행
+      env:
+        YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+      run: python main.py
+
+    - name: 새로 수집된 데이터 깃허브에 영구 저장
+      run: |
+        git config --global user.name 'github-actions[bot]'
+        git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+        git add musinsa_trends.json
+        git commit -m "Auto-update: 데일리 데이터 수집 완료" || exit 0
+        git push
