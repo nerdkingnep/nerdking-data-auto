@@ -1,49 +1,60 @@
 import json
-import urllib.request
-import re
+import cloudscraper
 from datetime import datetime
+import re
+import urllib.parse
 
 def fetch_musinsa_trends():
-    # 무신사의 데이터센터 IP 차단을 완벽하게 우회하기 위한 징검다리 서버 목록
-    # 1. Jina AI 리더 API: 글로벌 레지덴셜 프록시를 사용하여 봇 차단을 통과합니다.
-    # 2. 구글 번역기 캐시 서버: 구글의 공식 IP를 빌려 무신사에 우회 접속합니다.
-    urls_to_try = [
-        'https://r.jina.ai/https://api.musinsa.com/api2/sc/v1/keyword/search-home?popularCount=20&gf=A',
-        'https://translate.google.com/website?sl=ko&tl=ko&hl=ko&u=https://api.musinsa.com/api2/sc/v1/keyword/search-home?popularCount=20&gf=A'
-    ]
+    target_url = 'https://api.musinsa.com/api2/sc/v1/keyword/search-home?popularCount=20&gf=A'
+    proxy_url = f"https://api.allorigins.win/raw?url={urllib.parse.quote(target_url)}"
+    
+    urls_to_try = [target_url, proxy_url]
+    
+    # 강력한 봇 방어 우회 라이브러리 설정
+    scraper = cloudscraper.create_scraper(browser={'browser': 'chrome', 'platform': 'windows', 'mobile': False})
+    headers = {
+        'Referer': 'https://www.musinsa.com/',
+        'Origin': 'https://www.musinsa.com'
+    }
     
     keywords = []
     
     for url in urls_to_try:
-        print(f"우회 서버 접속 시도 중: {url[:50]}...")
+        print(f"접속 시도 중: {url[:50]}...")
         try:
-            # 봇 차단을 피하기 위한 기본 브라우저 정보 입력
-            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'})
-            with urllib.request.urlopen(req, timeout=20) as response:
-                html = response.read().decode('utf-8')
-                
-                # 우회 서버가 반환하는 복잡한 HTML이나 마크다운 텍스트 속에서 keyword 데이터만 강제로 추출합니다.
-                matches = re.findall(r'"keyword"\s*:\s*"([^"]+)"', html)
-                
-                if matches:
-                    seen = set()
-                    for m in matches:
-                        if m.strip() and m not in seen:
-                            seen.add(m)
-                            keywords.append(m)
+            response = scraper.get(url, headers=headers, timeout=20)
+            
+            if response.status_code == 200:
+                try:
+                    data = response.json()
+                    if 'data' in data and 'keywordList' in data['data']:
+                        keywords = [item['keyword'] for item in data['data']['keywordList']]
+                    elif 'data' in data and 'popularKeyword' in data['data']:
+                        keywords = [item['keyword'] for item in data['data']['popularKeyword']]
+                except:
+                    pass
                     
-                    print("데이터 우회 추출에 완벽하게 성공했습니다!")
-                    break # 성공 시 다음 우회 경로는 시도하지 않고 루프를 종료합니다.
+            if not keywords:
+                matches = re.findall(r'"keyword"\s*:\s*"([^"]+)"', response.text)
+                seen = set()
+                for m in matches:
+                    if m.strip() and m not in seen:
+                        seen.add(m)
+                        keywords.append(m)
+
+            if keywords:
+                print("데이터 우회 및 추출에 성공했습니다!")
+                break
         except Exception as e:
-            print(f"해당 경로 우회 실패: {e}")
+            print(f"해당 경로 실패: {e}")
             
     if keywords:
-        # 추출한 데이터를 깃허브 내에 json 파일로 영구 저장합니다.
         with open('musinsa_trends.json', 'w', encoding='utf-8') as f:
             json.dump({"updated_at": str(datetime.now()), "keywords": keywords}, f, ensure_ascii=False)
         print(f"최종 수집 완료: {len(keywords)}개의 트렌드 키워드를 확보했습니다.")
     else:
-        print("모든 우회 경로 접속이 차단되었습니다. 수집된 데이터가 없습니다.")
+        # 실패 시 빈 파일을 만들지 않고 스크립트를 에러로 종료시킵니다.
+        raise Exception("모든 수집 경로가 차단되어 데이터를 찾지 못했습니다.")
 
 if __name__ == "__main__":
     fetch_musinsa_trends()
