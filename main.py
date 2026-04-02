@@ -1,33 +1,42 @@
-import os
 import json
 import urllib.request
+import re
 from datetime import datetime
 
 def fetch_musinsa_trends():
-    # 파이썬 로봇을 일반 사용자인 것처럼 위장하여 무신사 방화벽을 통과합니다.
     url = 'https://api.musinsa.com/api2/sc/v1/keyword/search-home?popularCount=20&gf=A'
-    req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+    
+    # 일반 크롬 브라우저인 것처럼 위장
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'application/json, text/plain, */*'
+    }
+    req = urllib.request.Request(url, headers=headers)
     
     try:
         with urllib.request.urlopen(req) as response:
-            data = json.loads(response.read().decode())
-            
+            raw_data = response.read().decode('utf-8')
+        
         keywords = []
-        if 'data' in data and 'keywordList' in data['data']:
-            keywords = [item['keyword'] for item in data['data']['keywordList']]
-        elif 'data' in data and 'popularKeyword' in data['data']:
-            keywords = [item['keyword'] for item in data['data']['popularKeyword']]
-            
-        # 수집한 데이터를 깃허브 저장소 내에 파일로 영구 기록
+        
+        # API 구조와 무관하게 keyword 값만 강제로 찾아내는 정규식
+        matches = re.findall(r'"keyword"\s*:\s*"([^"]+)"', raw_data)
+        
+        # 중복 제거 및 순서 유지
+        seen = set()
+        for m in matches:
+            if m.strip() and m not in seen:
+                seen.add(m)
+                keywords.append(m)
+                
+        # 수집한 데이터를 파일로 영구 기록
         with open('musinsa_trends.json', 'w', encoding='utf-8') as f:
             json.dump({"updated_at": str(datetime.now()), "keywords": keywords}, f, ensure_ascii=False)
-        print("무신사 트렌드 수집 성공 및 파일 저장 완료!")
+            
+        print(f"수집 성공! 총 {len(keywords)}개의 키워드를 저장했습니다.")
         
     except Exception as e:
-        print(f"무신사 수집 에러: {e}")
+        print(f"수집 에러 발생: {e}")
 
 if __name__ == "__main__":
-    print("데이터 수집 자동화 시작...")
     fetch_musinsa_trends()
-    # 유튜브 데이터 데일리 수집 코드는 앱과 연동 확인 후 여기에 추가됩니다.
-    print("수집 종료.")
