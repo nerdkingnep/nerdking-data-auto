@@ -18,12 +18,10 @@ jobs:
       with:
         python-version: '3.10'
 
-    - name: 클라우드플레어 우회 라이브러리 설치
-      run: pip install cloudscraper
-
     - name: 파이썬 수집 코드 실행
       env:
         YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+        SCRAPER_API_KEY: ${{ secrets.SCRAPER_API_KEY }}
       run: python main.py
 
     - name: 새로 수집된 데이터 깃허브에 영구 저장
